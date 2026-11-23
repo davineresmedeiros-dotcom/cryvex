@@ -1,0 +1,87 @@
+name: Build Android (arm64-v8a)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar log
+        run: touch build.log
+
+      - name: Localizar NDK
+        run: |
+          NDK="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}}"
+          if [ -z "$NDK" ] || [ ! -d "$NDK" ]; then
+            echo "NDK nao encontrado no runner" | tee -a build.log
+            exit 1
+          fi
+          echo "NDK=$NDK" >> "$GITHUB_ENV"
+          echo "Usando NDK em $NDK" | tee -a build.log
+
+      - name: Configurar (CMake)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release 2>&1 | tee -a build.log
+
+      - name: Compilar
+        run: cmake --build build --parallel 2>&1 | tee -a build.log
+
+      - name: Verificar arquitetura
+        run: |
+          file build/libcryvex.so | tee -a build.log
+          file build/libcryvex.so | grep -q "aarch64"
+
+      - name: Enviar artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryvex-android-arm64
+          path: build/libcryvex.so
+          if-no-files-found: error
+
+      - name: Fechar issue de falha (build passou)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          N=$(gh issue list --state open --search "Falha de build in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$N" ]; then
+            gh issue close "$N" --comment "Build passou: $RUN_URL"
+          fi
+
+      - name: Abrir ou atualizar issue com o log (build falhou)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          {
+            echo "Falha no build. Execucao: $RUN_URL"
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo '```'
+            tail -n 80 build.log 2>/dev/null || echo "(sem log)"
+            echo '```'
+          } > issue_body.md
+          N=$(gh issue list --state open --search "Falha de build in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$N" ]; then
+            gh issue comment "$N" --body-file issue_body.md
+          else
+            gh issue create --title "Falha de build (Android arm64)" --body-file issue_body.md
+          fi
