@@ -6,7 +6,7 @@ O Cryvex é baseado no Geode (usa a mesma ideia de arquitetura), mas é um proje
 
 ## Status
 
-Marco 1 (esqueleto): compila uma `libcryvex.so` que registra uma linha no logcat ao ser carregada e expõe a checagem da versão alvo. **Ainda não faz hook em nada e ainda não é injetada no jogo.**
+Marco 1 (esqueleto): compila uma `libcryvex.so` que, ao ser carregada, registra no logcat a versão do Cryvex e tenta ler a versão do jogo instalado (`versionName`) via JNI. A checagem da versão alvo está em **modo só-log**: ela avisa se a versão for diferente de 2.2091, mas não bloqueia nada. **Ainda não faz hook em nada e ainda não é injetada no jogo.**
 
 ## Como compilar
 
@@ -23,6 +23,7 @@ Se o build falhar, o workflow abre (ou atualiza) uma issue chamada "Falha de bui
 
 - `CMakeLists.txt`: projeto CMake para o NDK do Android.
 - `include/cryvex/version.hpp`: versão do Cryvex e versão alvo do jogo.
+- `include/cryvex/game_version.hpp` e `src/game_version.cpp`: leitura do `versionName` do app via JNI.
 - `src/main.cpp`: ponto de entrada nativo (`JNI_OnLoad`) e checagem de versão exportada.
 - `.github/workflows/build-android.yml`: build no Actions.
 
@@ -35,4 +36,4 @@ Veja `THIRD_PARTY_NOTICES.md` para as licenças de terceiros.
 
 ## Licença
 
-A licença do Cryvex ainda não foi definida.
+Boost Software License 1.0 (BSL-1.0). Veja o arquivo `LICENSE`.
