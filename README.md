@@ -6,26 +6,27 @@ O Cryvex é baseado no Geode (usa a mesma ideia de arquitetura), mas é um proje
 
 ## Status
 
-Marco 1 (esqueleto): compila uma `libcryvex.so` que, ao ser carregada, registra no logcat a versão do Cryvex e tenta ler a versão do jogo instalado (`versionName`) via JNI. A checagem da versão alvo está em **modo só-log**: ela avisa se a versão for diferente de 2.2091, mas não bloqueia nada. **Ainda não faz hook em nada e ainda não é injetada no jogo.**
+- **Loader nativo (`libcryvex.so`)**: ao ser carregado, registra no logcat a versão do Cryvex e tenta ler a versão do jogo instalado via JNI. A checagem da versão alvo está em **modo só-log**. Ainda não faz hook em nada.
+- **Cryvex Launcher (pasta `launcher/`)**: app Android chamado "Cryvex". Por enquanto só mostra se o Geometry Dash está instalado e se a versão (`versionName` 2.2.145, `versionCode` 42) é a suportada. O botão de iniciar ainda está desativado.
+
+### Como o launcher vai funcionar
+
+A ideia é rodar o jogo instalado, sem modificar o APK, dentro do processo do launcher: o launcher carrega as bibliotecas nativas do jogo e depois a `libcryvex.so`. Isso ainda não foi implementado.
 
 ## Como compilar
 
-A compilação roda no GitHub Actions:
+A compilação roda no GitHub Actions (aba **Actions** → escolha o workflow → **Run workflow**):
 
-1. Abra a aba **Actions** do repositório.
-2. Escolha o workflow **Build Android (arm64-v8a)**.
-3. Toque em **Run workflow**.
-4. Ao terminar, baixe o artefato `cryvex-android-arm64` (contém a `libcryvex.so`).
+- **Build Android (arm64-v8a)**: gera o artefato `cryvex-android-arm64` (`libcryvex.so`).
+- **Build Launcher (APK)**: gera o artefato `cryvex-launcher-debug` (`app-debug.apk`). O APK de debug é assinado com uma chave gerada em cada execução, então para instalar uma versão nova é preciso desinstalar a anterior.
 
-Se o build falhar, o workflow abre (ou atualiza) uma issue chamada "Falha de build (Android arm64)" com o final do log. Quando passar, ele fecha essa issue.
+Se um build falhar, o workflow abre (ou atualiza) uma issue ("Falha de build (Android arm64)" ou "Falha de build (Launcher)") com o final do log. Quando passar, ele fecha a issue.
 
 ## Estrutura
 
-- `CMakeLists.txt`: projeto CMake para o NDK do Android.
-- `include/cryvex/version.hpp`: versão do Cryvex e versão alvo do jogo.
-- `include/cryvex/game_version.hpp` e `src/game_version.cpp`: leitura do `versionName` do app via JNI.
-- `src/main.cpp`: ponto de entrada nativo (`JNI_OnLoad`) e checagem de versão exportada.
-- `.github/workflows/build-android.yml`: build no Actions.
+- `CMakeLists.txt`, `include/`, `src/`: loader nativo para o NDK do Android.
+- `launcher/`: projeto Gradle do app Cryvex Launcher (`com.cryvex.launcher`).
+- `.github/workflows/`: builds no Actions.
 
 ## O que este repositório não contém
 

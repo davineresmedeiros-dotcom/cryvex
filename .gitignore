@@ -4,3 +4,5 @@ issue_body.md
 .idea/
 .vscode/
 .cache/
+.gradle/
+local.properties

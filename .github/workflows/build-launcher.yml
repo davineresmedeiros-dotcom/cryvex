@@ -1,0 +1,84 @@
+name: Build Launcher (APK)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar log
+        run: touch build.log
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Informacoes do ambiente
+        run: |
+          {
+            echo "ANDROID_HOME=${ANDROID_HOME:-}"
+            ls "${ANDROID_HOME:-/nonexistent}/platforms" 2>&1 || true
+            ls "${ANDROID_HOME:-/nonexistent}/build-tools" 2>&1 || true
+            java -version 2>&1
+            gradle --version 2>&1
+          } | tee -a build.log
+
+      - name: Compilar APK (debug)
+        working-directory: launcher
+        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee -a "$GITHUB_WORKSPACE/build.log"
+
+      - name: Enviar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryvex-launcher-debug
+          path: launcher/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Fechar issue de falha (build passou)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          N=$(gh issue list --state open --search '"Falha de build (Launcher)" in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$N" ]; then
+            gh issue close "$N" --comment "Build passou: $RUN_URL"
+          fi
+
+      - name: Abrir ou atualizar issue com o log (build falhou)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          {
+            echo "Falha no build do launcher. Execucao: $RUN_URL"
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo '```'
+            tail -n 100 build.log 2>/dev/null || echo "(sem log)"
+            echo '```'
+          } > issue_body.md
+          N=$(gh issue list --state open --search '"Falha de build (Launcher)" in:title' --json number --jq '.[0].number // empty')
+          if [ -n "$N" ]; then
+            gh issue comment "$N" --body-file issue_body.md
+          else
+            gh issue create --title "Falha de build (Launcher)" --body-file issue_body.md
+          fi
