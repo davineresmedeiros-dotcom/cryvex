@@ -34,7 +34,7 @@ private:
 
 } // namespace
 
-std::string readGameVersionName(JavaVM* vm) {
+GameVersion readGameVersion(JavaVM* vm) {
     if (vm == nullptr) {
         return {};
     }
@@ -89,15 +89,24 @@ std::string readGameVersionName(JavaVM* vm) {
         return {};
     }
 
-    // Campo versionName
+    // Campos versionName e versionCode
     LocalRef infoClass(env, env->GetObjectClass(info.get()));
-    jfieldID versionNameField = env->GetFieldID(
-        static_cast<jclass>(infoClass.get()), "versionName", "Ljava/lang/String;");
+    auto infoClassRef = static_cast<jclass>(infoClass.get());
+    jfieldID versionNameField = env->GetFieldID(infoClassRef, "versionName", "Ljava/lang/String;");
     if (failed(env) || versionNameField == nullptr) {
         return {};
     }
+    jfieldID versionCodeField = env->GetFieldID(infoClassRef, "versionCode", "I");
+    if (failed(env) || versionCodeField == nullptr) {
+        return {};
+    }
+
     LocalRef versionName(env, env->GetObjectField(info.get(), versionNameField));
     if (failed(env) || !versionName) {
+        return {};
+    }
+    jint versionCode = env->GetIntField(info.get(), versionCodeField);
+    if (failed(env)) {
         return {};
     }
 
@@ -106,7 +115,9 @@ std::string readGameVersionName(JavaVM* vm) {
     if (chars == nullptr) {
         return {};
     }
-    std::string result(chars);
+    GameVersion result;
+    result.name = chars;
+    result.code = static_cast<int>(versionCode);
     env->ReleaseStringUTFChars(text, chars);
     return result;
 }
